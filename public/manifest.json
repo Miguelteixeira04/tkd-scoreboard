@@ -1,0 +1,17 @@
+{
+  "name": "TKD Remote",
+  "short_name": "TKD",
+  "start_url": "/remote.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "landscape",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1534/1534106.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

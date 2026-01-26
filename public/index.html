@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <link rel="manifest" href="/manifest.json">
+
+    <title>Comando TKD</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <audio id="audioIntervalo" src="intervalo.mp3" preload="auto"></audio>
+
+    <div id="victoryOverlay">
+        <div class="winner-title">VENCEDOR</div>
+        <div class="winner-name" id="winName">NOME</div>
+        <div class="winner-score" id="winScore">2 - 1</div>
+    </div>
+
+    <div id="settingsModal">
+        <h2 style="margin-top:0">Configuração de Combate</h2>
+        <div class="form-group">
+            <label>Nº Rounds (Best of)</label>
+            <select id="inMaxRounds">
+                <option value="3" selected>Melhor de 3</option>
+                <option value="1">1 Round (Morte Súbita)</option>
+                <option value="5">Melhor de 5</option>
+            </select>
+        </div>
+        <div class="form-group"><label>Atleta Azul</label><input type="text" id="inBlueName" value="HONG"></div>
+        <div class="form-group"><label>Atleta Vermelho</label><input type="text" id="inRedName" value="CHUNG"></div>
+        <div class="form-group"><label>Tempo Round (s)</label><input type="number" id="inRoundTime" value="120"></div>
+        <div class="form-group"><label>Tempo Descanso (s)</label><input type="number" id="inRestTime" value="60"></div>
+        <button class="btn-save" onclick="saveSettings()">GUARDAR & INICIAR</button>
+    </div>
+
+    <div class="board-container">
+        <div class="zone blue-zone">
+            <div class="athlete-name" id="dispBlueName">HONG</div>
+            <div class="rounds-won-container" id="blueRounds"></div>
+            <div class="score-big" id="scoreBlue">0</div>
+            <div class="penalty-box">GAM-JEOM: <span id="penBlue">0</span></div>
+        </div>
+
+        <div class="center-panel" id="centerPanel">
+            <div class="round-display" id="roundLabel">ROUND <span id="round">1</span></div>
+            <div class="timer" id="timer">02:00</div>
+            <button class="btn-settings" onclick="openSettings()">⚙️ Config</button>
+        </div>
+
+        <div class="zone red-zone">
+            <div class="athlete-name" id="dispRedName">CHUNG</div>
+            <div class="rounds-won-container" id="redRounds"></div>
+            <div class="score-big" id="scoreRed">0</div>
+            <div class="penalty-box">GAM-JEOM: <span id="penRed">0</span></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const modal = document.getElementById('settingsModal');
+        const overlay = document.getElementById('victoryOverlay');
+        const centerPanel = document.getElementById('centerPanel');
+        const audioIntervalo = document.getElementById('audioIntervalo');
+        
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playImpactSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const t = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, t);
+            osc.frequency.exponentialRampToValueAtTime(50, t + 0.08);
+
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(5.0, t + 0.01); 
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start(t);
+            osc.stop(t + 0.15);
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        function openSettings() { modal.classList.remove('hidden'); }
+
+        function saveSettings() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            audioIntervalo.play().then(() => {
+                audioIntervalo.pause();
+                audioIntervalo.currentTime = 0;
+            }).catch(e => console.log("Áudio ainda bloqueado", e));
+
+            const config = {
+                blueName: document.getElementById('inBlueName').value,
+                redName: document.getElementById('inRedName').value,
+                roundTime: document.getElementById('inRoundTime').value,
+                restTime: document.getElementById('inRestTime').value,
+                maxRounds: document.getElementById('inMaxRounds').value
+            };
+            socket.emit('updateSettings', config);
+            modal.classList.add('hidden');
+        }
+
+        function updateDots(containerId, total, won) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            const dotsNeeded = Math.ceil(total / 2); 
+            for(let i=0; i<dotsNeeded; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'round-dot' + (i < won ? ' won' : '');
+                container.appendChild(dot);
+            }
+        }
+
+        socket.on('updateState', (data) => {
+            document.getElementById('dispBlueName').innerText = data.blueName;
+            document.getElementById('dispRedName').innerText = data.redName;
+            document.getElementById('scoreBlue').innerText = data.blueScore;
+            document.getElementById('scoreRed').innerText = data.redScore;
+            document.getElementById('penBlue').innerText = data.bluePenalty;
+            document.getElementById('penRed').innerText = data.redPenalty;
+            
+            // Lógica Visual do Intervalo
+            if (data.mode === 'rest') {
+                centerPanel.classList.add('rest-active');
+                document.getElementById('roundLabel').innerHTML = "INTERVALO";
+            } else {
+                centerPanel.classList.remove('rest-active');
+                document.getElementById('roundLabel').innerHTML = 'ROUND <span id="round">' + data.currentRound + '</span>';
+            }
+
+            document.getElementById('timer').innerText = formatTime(data.time);
+            
+            updateDots('blueRounds', data.maxRounds, data.blueRoundsWon);
+            updateDots('redRounds', data.maxRounds, data.redRoundsWon);
+
+            if(!data.matchOver) {
+                overlay.classList.remove('show-victory');
+            }
+        });
+
+        socket.on('updateTimer', (time) => {
+            document.getElementById('timer').innerText = formatTime(time);
+        });
+
+        socket.on('playSound', (type) => {
+            if (type === 'point') {
+                playImpactSound(); 
+            } else if (type === 'end') {
+                audioIntervalo.currentTime = 0;
+                audioIntervalo.play().catch(e => console.log("Erro ao tocar som:", e));
+            }
+        });
+
+        socket.on('matchEnded', (winner) => {
+            document.getElementById('winName').innerText = winner.name;
+            document.getElementById('winScore').innerText = winner.score;
+            overlay.style.backgroundColor = winner.color;
+            overlay.classList.add('show-victory');
+
+            setTimeout(() => {
+                overlay.classList.remove('show-victory');
+            }, 7000);
+        });
+    </script>
+</body>
+</html>

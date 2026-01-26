@@ -1,0 +1,295 @@
+body {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Arial Black', sans-serif;
+    background-color: #111;
+    color: #fff;
+    user-select: none;
+    overscroll-behavior: none; 
+}
+
+.board-container {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+}
+
+.zone {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.blue-zone { background-color: #0047BB; }
+.red-zone { background-color: #E21B22; }
+
+.athlete-name {
+    position: absolute;
+    top: 20px;
+    z-index: 5;
+    font-size: 3vw;
+    text-transform: uppercase;
+    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
+}
+
+.score-big {
+    font-size: 25vw;
+    line-height: 1;
+    font-weight: 900;
+    text-shadow: 5px 5px 10px rgba(0, 0, 0, 0.5);
+}
+
+.penalty-box {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 2vw;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+}
+
+.rounds-won-container {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.round-dot {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.4);
+    border: 2px solid #fff;
+}
+
+.round-dot.won {
+    background-color: #FFD700;
+    box-shadow: 0 0 10px #FFD700;
+}
+
+.center-panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    width: 18%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border-left: 3px solid #fff;
+    border-right: 3px solid #fff;
+}
+
+.timer {
+    font-size: 4vw;
+    color: #FFD700;
+    margin-bottom: 20px;
+    transition: color 0.3s;
+}
+
+.round-display {
+    font-size: 2vw;
+    margin-bottom: 50px;
+}
+
+.rest-active .timer {
+    color: #FF4500;
+    animation: blink 1s infinite;
+}
+.rest-active .round-display { color: #FF4500; }
+
+@keyframes blink { 50% { opacity: 0.5; } }
+
+#settingsModal {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    width: 400px;
+    padding: 30px;
+    background: #222;
+    border: 2px solid #555;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.9);
+}
+
+.hidden { display: none; }
+
+.form-group {
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-family: Arial, sans-serif;
+    font-size: 1rem;
+    color: #aaa;
+}
+
+input, select {
+    width: 100%;
+    padding: 10px;
+    font-size: 1.2rem;
+    box-sizing: border-box;
+}
+
+.btn-save {
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px 20px;
+    font-size: 1.2rem;
+    background: green;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-settings {
+    position: absolute;
+    bottom: 20px;
+    font-size: 0.8rem;
+    background: transparent;
+    border: 1px solid #555;
+    color: #555;
+    cursor: pointer;
+}
+
+#victoryOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s;
+}
+
+.show-victory {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+.winner-title {
+    font-size: 5vw;
+    margin-bottom: 20px;
+    text-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+}
+
+.winner-name {
+    font-size: 8vw;
+    font-weight: 900;
+    text-transform: uppercase;
+    text-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+}
+
+.winner-score {
+    margin-top: 20px;
+    padding: 10px 30px;
+    font-size: 4vw;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 20px;
+}
+
+.remote-layout {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%; 
+    display: flex;
+    background: #000;
+    overflow: hidden; 
+}
+
+.player-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 10px;
+}
+
+.top-row {
+    flex: 2; 
+    display: flex;
+    gap: 10px;
+}
+
+.mid-row {
+    flex: 1;
+    display: flex;
+}
+
+.bot-row {
+    flex: 1.5;
+    display: flex;
+    gap: 10px;
+}
+
+.center-controls {
+    width: 80px; 
+    background: #222;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    padding: 5px;
+    border-left: 2px solid #444;
+    border-right: 2px solid #444;
+}
+
+.btn-tkd {
+    border-radius: 8px;
+    font-family: 'Arial Black', sans-serif;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.3);
+    border: none;
+    transition: transform 0.1s;
+    color: #fff;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.btn-tkd:active {
+    transform: translateY(4px);
+    box-shadow: none;
+}
+
+.head-btn { background: rgba(255,255,255,0.3); font-size: 1.2rem; width: 100%; }
+.body-btn { background: rgba(0,0,0,0.2); font-size: 1.2rem; width: 100%; }
+.tech-btn { background: #6a0dad; font-size: 1rem; width: 100%; border-radius: 8px; }
+.punch-btn { background: #444; flex: 1; font-size: 0.9rem; }
+.gamjeom-btn { background: #FFD700; color: #000; flex: 1; font-size: 0.9rem; font-weight: bold;}
+
+.ctrl-btn {
+    flex: 1;
+    border-radius: 6px;
+    border: 1px solid #555;
+    background: #333;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.main-action { background: #1a1a1a; color: #00ff00; }
+.next-action { color: #ffa500; }
+.reset-action { color: #ff4444; }
+.fs-action { flex: 0.5; font-size: 1.2rem; }
