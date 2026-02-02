@@ -69,11 +69,11 @@
         function controlTimer() { socket.emit('action', { type: 'timer' }); }
         
         function nextRound() {
-            if(confirm('Próximo Round?')) socket.emit('action', { type: 'nextRound' });
+            socket.emit('action', { type: 'nextRound' });
         }
 
         function resetMatch() {
-            if(confirm('Reset total do combate?')) socket.emit('action', { type: 'reset' });
+            socket.emit('action', { type: 'reset' });
         }
 
         function toggleFullScreen() {
