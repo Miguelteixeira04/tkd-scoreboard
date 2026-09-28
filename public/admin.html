@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mesa Técnica - Controlo PC</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 16px;
+            background: #181818;
+            color: #eee;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            height: 100vh;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        .preview-pane {
+            flex: 1.4;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            height: 100%;
+        }
+
+        .video-box-wrapper {
+            width: 82%;
+            margin: 0 auto;
+            flex-shrink: 0;
+        }
+
+        .video-box {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+            border: 1px solid #333;
+        }
+
+        .video-box iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1920px;
+            height: 1080px;
+            border: none;
+            transform-origin: 0 0;
+            pointer-events: none;
+        }
+
+        .history-card {
+            flex: 1;
+            background: #212121;
+            border-radius: 12px;
+            padding: 12px 16px;
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .history-card h3 {
+            margin: 0 0 6px 0;
+            font-size: 0.95rem;
+            color: #bbb;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .table-wrapper {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .score-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+        }
+        .score-table th, .score-table td {
+            padding: 6px 12px;
+            font-size: 1.1rem;
+            border-bottom: 1px solid #333;
+        }
+        .score-table th {
+            background: #181818;
+            color: #aaa;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        .th-blue { color: #5c9eff !important; border-bottom: 2px solid #0047BB !important; }
+        .th-red { color: #ff6b6b !important; border-bottom: 2px solid #E21B22 !important; }
+        .score-blue-cell { color: #5c9eff; font-weight: bold; font-size: 1.25rem; }
+        .score-red-cell { color: #ff6b6b; font-weight: bold; font-size: 1.25rem; }
+        .empty-history {
+            text-align: center;
+            color: #666;
+            padding: 16px;
+            font-style: italic;
+            font-size: 0.9rem;
+        }
+
+        .control-pane {
+            flex: 1;
+            background: #212121;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            overflow-y: auto;
+        }
+        h2 { 
+            margin: 0 0 4px 0; 
+            font-size: 1.15rem; 
+            border-bottom: 1px solid #333; 
+            padding-bottom: 6px; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .match-badge-ctrl {
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .match-badge-ctrl input {
+            width: 55px;
+            padding: 4px 6px;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+        .match-badge-ctrl select {
+            width: 60px;
+            padding: 4px 6px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr 1fr;
+            gap: 8px;
+            background: #282828;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+        }
+
+        .athlete-card {
+            padding: 8px 12px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .card-blue { 
+            background: rgba(0, 71, 187, 0.25); 
+            border-left: 5px solid #0047BB; 
+        }
+        .card-red { 
+            background: rgba(226, 27, 34, 0.25); 
+            border-left: 5px solid #E21B22; 
+        }
+
+        label { 
+            font-size: 0.75rem; 
+            color: #bbb; 
+            text-transform: uppercase; 
+            font-weight: bold; 
+        }
+        input, select {
+            width: 100%;
+            background: #111;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            outline: none;
+        }
+        input:focus, select:focus { border-color: #3ea6ff; }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+        }
+
+        .btn-update {
+            background: #0070e0;
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: bold;
+            border: none;
+            padding: 11px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-update:hover:not(:disabled) { background: #0056b3; }
+        .btn-update:disabled {
+            background: #333 !important;
+            color: #777 !important;
+            cursor: not-allowed;
+            opacity: 0.6;
+            border: 1px solid #444;
+        }
+
+        .referee-box {
+            display: none;
+            background: #2d1313;
+            border: 2px solid #e74c3c;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        .referee-box strong {
+            color: #ff7675;
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+        }
+        .referee-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .ref-btn {
+            flex: 1;
+            padding: 9px;
+            color: #fff;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .ref-blue { background: #0047BB; }
+        .ref-red { background: #E21B22; }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-top: auto;
+            border-top: 1px solid #333;
+            padding-top: 10px;
+        }
+        .btn-act {
+            border: none;
+            padding: 11px 6px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .act-timer { background: #2ba640; color: #fff; }
+        .act-round { background: #f39c12; color: #fff; }
+        .act-reset { background: #c0392b; color: #fff; }
+    </style>
+</head>
+<body>
+
+    <div class="preview-pane">
+        <div class="video-box-wrapper">
+            <div class="video-box" id="videoBox">
+                <iframe id="tvFrame" src="index.html"></iframe>
+            </div>
+        </div>
+
+        <div class="history-card">
+            <h3>Resultados por Round</h3>
+            <div class="table-wrapper">
+                <table class="score-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 25%;">#</th>
+                            <th class="th-blue" id="lblBlue">Azul</th>
+                            <th class="th-red" id="lblRed">Vermelho</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBody">
+                        <tr>
+                            <td colspan="3" class="empty-history">Nenhum round concluído ainda</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="control-pane">
+        <h2>
+            Gestão de Combate
+            <div class="match-badge-ctrl">
+                <span>Área:</span>
+                <select id="courtArea">
+                    <option value="A" selected>A</option>
+                    <option value="B">B</option>
+                </select>
+                <span>Nº:</span>
+                <input type="number" id="matchNumber" value="1" min="1">
+            </div>
+        </h2>
+
+        <!-- CATEGORIA / ESCALÃO / GÉNERO / PESO -->
+        <div class="category-grid">
+            <div>
+                <label for="division">Escalão</label>
+                <select id="division" onchange="onCategoryChanged()">
+                    <option value="Benjamins">Benjamins</option>
+                    <option value="Infantis">Infantis</option>
+                    <option value="Cadetes">Cadetes</option>
+                    <option value="Juniores">Juniores</option>
+                    <option value="Seniores" selected>Seniores</option>
+                    <option value="Masters">Masters</option>
+                </select>
+            </div>
+            <div>
+                <label for="gender">Género</label>
+                <select id="gender" onchange="onCategoryChanged()">
+                    <option value="M" selected>M</option>
+                    <option value="F">F</option>
+                </select>
+            </div>
+            <div>
+                <label for="weight">Peso</label>
+                <select id="weight"></select>
+            </div>
+        </div>
+
+        <div class="athlete-card card-blue">
+            <label for="blueName">Atleta Azul (Chung)</label>
+            <input type="text" id="blueName" placeholder="Nome do Atleta Azul" value="HONG">
+        </div>
+
+        <div class="athlete-card card-red">
+            <label for="redName">Atleta Vermelho (Hong)</label>
+            <input type="text" id="redName" placeholder="Nome do Atleta Vermelho" value="CHUNG">
+        </div>
+
+        <div class="config-grid">
+            <div>
+                <label for="maxRounds">Rounds</label>
+                <select id="maxRounds">
+                    <option value="3" selected>Melhor de 3</option>
+                    <option value="1">1 Round</option>
+                    <option value="5">Melhor de 5</option>
+                </select>
+            </div>
+            <div>
+                <label for="roundTime">Tempo (s)</label>
+                <input type="number" id="roundTime" value="90">
+            </div>
+            <div>
+                <label for="restTime">Pausa (s)</label>
+                <input type="number" id="restTime" value="35">
+            </div>
+        </div>
+
+        <button class="btn-update" id="btnUpdateMatch" onclick="applyAndNewMatch()">Atualizar Atletas & Novo Combate</button>
+
+        <div id="refereeBox" class="referee-box">
+            <strong>DECISÃO DO ÁRBITRO (EMPATE GOLDEN POINT)</strong>
+            <div class="referee-buttons">
+                <button class="ref-btn ref-blue" onclick="decideWinner('blue')">Vencedor AZUL (+3)</button>
+                <button class="ref-btn ref-red" onclick="decideWinner('red')">Vencedor VERMELHO (+3)</button>
+            </div>
+        </div>
+
+        <div class="quick-actions">
+            <button class="btn-act act-timer" onclick="triggerAction('timer')">⏱ START / STOP</button>
+            <button class="btn-act act-round" onclick="triggerAction('nextMatch')">➤ PRÓX. COMBATE</button>
+            <button class="btn-act act-reset" onclick="triggerAction('reset')">↺ RESET</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const frame = document.getElementById('tvFrame');
+        const box = document.getElementById('videoBox');
+        const btnUpdate = document.getElementById('btnUpdateMatch');
+        const refereeBox = document.getElementById('refereeBox');
+
+        const WEIGHT_DATA = {
+            Benjamins: {
+                time: 30, rest: 20,
+                M: ["-20kg", "-24kg", "-28kg", "+28kg"],
+                F: ["-20kg", "-24kg", "-28kg", "+28kg"]
+            },
+            Infantis: {
+                time: 45, rest: 20,
+                M: ["-27kg", "-30kg", "-35kg", "-40kg", "-45kg", "+45kg"],
+                F: ["-27kg", "-30kg", "-35kg", "-40kg", "-45kg", "+45kg"]
+            },
+            Cadetes: {
+                time: 60, rest: 25,
+                M: ["-33kg", "-37kg", "-41kg", "-45kg", "-49kg", "-53kg", "-57kg", "-61kg", "-65kg", "+65kg"],
+                F: ["-29kg", "-33kg", "-37kg", "-41kg", "-44kg", "-47kg", "-51kg", "-55kg", "-59kg", "+59kg"]
+            },
+            Juniores: {
+                time: 75, rest: 30,
+                M: ["-45kg", "-48kg", "-51kg", "-55kg", "-59kg", "-63kg", "-68kg", "-73kg", "-78kg", "+78kg"],
+                F: ["-42kg", "-44kg", "-46kg", "-49kg", "-52kg", "-55kg", "-59kg", "-63kg", "-68kg", "+68kg"]
+            },
+            Seniores: {
+                time: 90, rest: 35,
+                M: ["-54kg", "-58kg", "-63kg", "-68kg", "-74kg", "-80kg", "-87kg", "+87kg"],
+                F: ["-46kg", "-49kg", "-53kg", "-57kg", "-62kg", "-67kg", "-73kg", "+73kg"]
+            },
+            Masters: {
+                time: 60, rest: 25,
+                M: ["-58kg", "-68kg", "-80kg", "+80kg"],
+                F: ["-49kg", "-57kg", "-67kg", "+67kg"]
+            }
+        };
+
+        function onCategoryChanged() {
+            const div = document.getElementById('division').value;
+            const gen = document.getElementById('gender').value;
+            const cat = WEIGHT_DATA[div];
+
+            if (!cat) return;
+
+            document.getElementById('roundTime').value = cat.time;
+            document.getElementById('restTime').value = cat.rest;
+
+            const weightSelect = document.getElementById('weight');
+            const weights = cat[gen] || [];
+            weightSelect.innerHTML = weights.map(w => `<option value="${w}">${w}</option>`).join('');
+        }
+
+        onCategoryChanged();
+
+        function updateScale() {
+            if (!box || !frame) return;
+            const scale = box.clientWidth / 1920;
+            frame.style.transform = `scale(${scale})`;
+        }
+
+        window.addEventListener('resize', updateScale);
+        window.addEventListener('load', updateScale);
+        setInterval(updateScale, 500);
+
+        function triggerAction(actionType) {
+            if (actionType === 'nextMatch') {
+                const blue = document.getElementById('blueName').value.trim() || 'HONG';
+                const red = document.getElementById('redName').value.trim() || 'CHUNG';
+                socket.emit('action', { 
+                    type: 'nextMatch',
+                    blueName: blue,
+                    redName: red
+                });
+            } else {
+                socket.emit('action', { type: actionType });
+            }
+        }
+
+        function decideWinner(color) {
+            socket.emit('action', { type: 'refereeDecision', color: color });
+        }
+
+        function applyAndNewMatch() {
+            const div = document.getElementById('division').value;
+            const gen = document.getElementById('gender').value;
+            const wei = document.getElementById('weight').value;
+            
+            let divLabel = div;
+            if (div === 'Seniores') divLabel = 'Sénior';
+            else if (div === 'Juniores') divLabel = 'Júnior';
+            else if (div === 'Benjamins') divLabel = 'Benjamin';
+            else if (div === 'Masters') divLabel = 'Master';
+
+            const categoryString = `${divLabel} ${gen} ${wei}`;
+
+            const config = {
+                area: document.getElementById('courtArea').value,
+                matchNumber: document.getElementById('matchNumber').value,
+                category: categoryString,
+                division: div,
+                gender: gen,
+                weight: wei,
+                blueName: document.getElementById('blueName').value.trim() || 'HONG',
+                redName: document.getElementById('redName').value.trim() || 'CHUNG',
+                roundTime: document.getElementById('roundTime').value,
+                restTime: document.getElementById('restTime').value,
+                maxRounds: document.getElementById('maxRounds').value
+            };
+            socket.emit('updateSettings', config);
+        }
+
+        function renderHistory(history, blueName, redName) {
+            document.getElementById('lblBlue').innerText = blueName || 'Azul';
+            document.getElementById('lblRed').innerText = redName || 'Vermelho';
+
+            const tbody = document.getElementById('historyBody');
+            if (!history || history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="empty-history">Nenhum round concluído ainda</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = history.map(h => {
+                const bluePen = h.bluePenalty || 0;
+                const redPen = h.redPenalty || 0;
+                const blueText = `${bluePen} ${bluePen === 1 ? 'falta' : 'faltas'}`;
+                const redText = `${redPen} ${redPen === 1 ? 'falta' : 'faltas'}`;
+
+                return `
+                    <tr>
+                        <td><strong>R${h.round}</strong></td>
+                        <td class="score-blue-cell">
+                            ${h.blueScore} <span style="font-size: 0.8rem; font-weight: normal; color: #aaa;">(${blueText})</span>
+                        </td>
+                        <td class="score-red-cell">
+                            ${h.redScore} <span style="font-size: 0.8rem; font-weight: normal; color: #aaa;">(${redText})</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        socket.on('updateState', (state) => {
+            if (document.activeElement !== document.getElementById('courtArea') && state.area) {
+                document.getElementById('courtArea').value = state.area;
+            }
+
+            if (document.activeElement !== document.getElementById('matchNumber')) {
+                document.getElementById('matchNumber').value = state.matchNumber;
+            }
+
+            if (document.activeElement !== document.getElementById('blueName')) {
+                document.getElementById('blueName').value = state.blueName;
+            }
+            if (document.activeElement !== document.getElementById('redName')) {
+                document.getElementById('redName').value = state.redName;
+            }
+
+            renderHistory(state.roundsHistory, state.blueName, state.redName);
+
+            if (refereeBox) {
+                refereeBox.style.display = (state.mode === 'referee_decision') ? 'block' : 'none';
+            }
+
+            const isLocked = state.matchStarted && !state.matchOver;
+            btnUpdate.disabled = isLocked;
+            btnUpdate.innerText = isLocked ? "Combate em Curso..." : "Atualizar Atletas & Novo Combate";
+        });
+    </script>
+</body>
+</html>

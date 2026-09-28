@@ -16,20 +16,22 @@
     
     <div class="remote-layout">
         
+        <!-- ZONA DO ATLETA AZUL (HONG) -->
         <div class="player-col blue-zone">
             <div class="top-row">
-                <button class="btn-tkd head-btn" onclick="sendScore('blue', 3)">CABEÇA (3)</button>
-                <button class="btn-tkd body-btn" onclick="sendScore('blue', 2)">TRONCO (2)</button>
+                <button class="btn-tkd head-btn" onclick="sendScore('blue', 3, 'head')">CABEÇA (3)</button>
+                <button class="btn-tkd body-btn" onclick="sendScore('blue', 2, 'body')">TRONCO (2)</button>
             </div>
             <div class="mid-row">
-                <button class="btn-tkd tech-btn" onclick="sendScore('blue', 2)">ROTATIVO (+2)</button>
+                <button class="btn-tkd tech-btn" onclick="sendScore('blue', 2, 'turning')">ROTATIVO (+2)</button>
             </div>
             <div class="bot-row">
-                <button class="btn-tkd punch-btn" onclick="sendScore('blue', 1)">SOCO</button>
+                <button class="btn-tkd punch-btn" onclick="sendScore('blue', 1, 'punch')">SOCO</button>
                 <button class="btn-tkd gamjeom-btn" onclick="sendPenalty('blue')">GAM-JEOM</button>
             </div>
         </div>
 
+        <!-- CONTROLOS CENTRAIS -->
         <div class="center-controls">
             <button class="ctrl-btn main-action" onclick="controlTimer()">⏱<br>START</button>
             <button class="ctrl-btn next-action" onclick="nextRound()">➤<br>RND</button>
@@ -37,16 +39,17 @@
             <button class="ctrl-btn fs-action" onclick="toggleFullScreen()">⛶</button>
         </div>
 
+        <!-- ZONA DO ATLETA VERMELHO (CHUNG) -->
         <div class="player-col red-zone">
             <div class="top-row">
-                <button class="btn-tkd head-btn" onclick="sendScore('red', 3)">CABEÇA (3)</button>
-                <button class="btn-tkd body-btn" onclick="sendScore('red', 2)">TRONCO (2)</button>
+                <button class="btn-tkd head-btn" onclick="sendScore('red', 3, 'head')">CABEÇA (3)</button>
+                <button class="btn-tkd body-btn" onclick="sendScore('red', 2, 'body')">TRONCO (2)</button>
             </div>
             <div class="mid-row">
-                <button class="btn-tkd tech-btn" onclick="sendScore('red', 2)">ROTATIVO (+2)</button>
+                <button class="btn-tkd tech-btn" onclick="sendScore('red', 2, 'turning')">ROTATIVO (+2)</button>
             </div>
             <div class="bot-row">
-                <button class="btn-tkd punch-btn" onclick="sendScore('red', 1)">SOCO</button>
+                <button class="btn-tkd punch-btn" onclick="sendScore('red', 1, 'punch')">SOCO</button>
                 <button class="btn-tkd gamjeom-btn" onclick="sendPenalty('red')">GAM-JEOM</button>
             </div>
         </div>
@@ -56,17 +59,27 @@
     <script>
         const socket = io();
 
-        function sendScore(color, points) {
-            if(navigator.vibrate) navigator.vibrate(50);
-            socket.emit('action', { type: 'score', color: color, points: points });
+        function sendScore(color, points, actionKind = 'other') {
+            if (navigator.vibrate) navigator.vibrate(50);
+            socket.emit('action', { 
+                type: 'score', 
+                color: color, 
+                points: points, 
+                actionKind: actionKind 
+            });
         }
 
         function sendPenalty(color) {
-            if(navigator.vibrate) navigator.vibrate(200);
-            socket.emit('action', { type: 'penalty', color: color });
+            if (navigator.vibrate) navigator.vibrate(200);
+            socket.emit('action', { 
+                type: 'penalty', 
+                color: color 
+            });
         }
 
-        function controlTimer() { socket.emit('action', { type: 'timer' }); }
+        function controlTimer() { 
+            socket.emit('action', { type: 'timer' }); 
+        }
         
         function nextRound() {
             socket.emit('action', { type: 'nextRound' });

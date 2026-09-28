@@ -8,7 +8,7 @@ body {
     background-color: #111;
     color: #fff;
     user-select: none;
-    overscroll-behavior: none; 
+    overscroll-behavior: none;
 }
 
 .board-container {
@@ -31,7 +31,10 @@ body {
 
 .athlete-name {
     position: absolute;
-    top: 20px;
+    top: 8vh;
+    left: 0;
+    width: 100%;
+    text-align: center;
     z-index: 5;
     font-size: 3vw;
     text-transform: uppercase;
@@ -73,11 +76,7 @@ body {
 }
 
 .center-panel {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
+    position: relative;
     z-index: 10;
     width: 18%;
     background: rgba(0, 0, 0, 0.85);
@@ -105,6 +104,7 @@ body {
     color: #FF4500;
     animation: blink 1s infinite;
 }
+
 .rest-active .round-display { color: #FF4500; }
 
 @keyframes blink { 50% { opacity: 0.5; } }
@@ -213,10 +213,10 @@ input, select {
     right: 0;
     bottom: 0;
     width: 100%;
-    height: 100%; 
+    height: 100%;
     display: flex;
     background: #000;
-    overflow: hidden; 
+    overflow: hidden;
 }
 
 .player-col {
@@ -228,7 +228,7 @@ input, select {
 }
 
 .top-row {
-    flex: 2; 
+    flex: 2;
     display: flex;
     gap: 10px;
 }
@@ -245,7 +245,7 @@ input, select {
 }
 
 .center-controls {
-    width: 80px; 
+    width: 80px;
     background: #222;
     display: flex;
     flex-direction: column;
