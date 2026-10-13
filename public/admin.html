@@ -556,6 +556,19 @@
             btnUpdate.disabled = isLocked;
             btnUpdate.innerText = isLocked ? "Combate em Curso..." : "Atualizar Atletas & Novo Combate";
         });
+        
+        //parar com o spacebar
+        document.addEventListener('keydown', function(event) {
+            if (event.code === 'Space') {
+                const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+                if (activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea') {
+                    return;
+                }
+
+                event.preventDefault(); 
+                triggerAction('timer');
+            }
+        });
     </script>
 </body>
 </html>

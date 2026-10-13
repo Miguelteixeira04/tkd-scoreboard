@@ -1,15 +1,16 @@
-const express = require('express');
-const http = require('http');
 const { Server } = require("socket.io");
+const express = require('express');
 const path = require('path');
+const http = require('http');
 const os = require('os');
+const fs = require('fs'); 
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// URL oficial da Web App no Google Apps Script
-const GOOGLE_SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwM8gQRX_6pqLAwPmNIOWFn71hGvpsCTuJ0qx62ksYz7CEGBFUBJpx1tb_smJIyxJS2/exec";
+// Google Apps Script
+const GOOGLE_SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycby8blztNilj0hPr3zqI8K9VR-IWrZ4IBneFRkEtgKTqrg-UUw4BKv8bSUHKulp7BmNE/exec";
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -267,6 +268,23 @@ function forceNextRound() {
     }
 }
 
+function saveLocalBackup(payload) {
+    try {
+        const backupEntry = {
+            dataHora: new Date().toLocaleString("pt-PT"),
+            ...payload
+        };
+        fs.appendFileSync(
+            path.join(__dirname, 'backup_combates.jsonl'),
+            JSON.stringify(backupEntry) + '\n',
+            'utf8'
+        );
+        console.log(`[BACKUP LOCAL] Combate ${payload.matchNumber} guardado com sucesso no disco.`);
+    } catch (err) {
+        console.error("❌ Erro ao guardar backup local:", err);
+    }
+}
+
 function sendResultsToGoogleSheet(payload) {
     if (!GOOGLE_SHEET_WEBAPP_URL) return;
     fetch(GOOGLE_SHEET_WEBAPP_URL, {
@@ -274,7 +292,10 @@ function sendResultsToGoogleSheet(payload) {
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload),
         redirect: "follow"
-    }).catch(err => console.error("Erro Google Sheets:", err));
+    })
+    .then(res => res.text())
+    .then(body => console.log("Resposta Google Sheets:", body))
+    .catch(err => console.error("❌ Erro Google Sheets:", err));
 }
 
 function endMatch() {
@@ -297,7 +318,7 @@ function endMatch() {
 
     if (!gameState.sheetSent && gameState.roundsHistory.length > 0) {
         gameState.sheetSent = true;
-        sendResultsToGoogleSheet({
+        const payload = {
             matchNumber: `${gameState.matchNumber}${gameState.area || 'A'}`,
             category: gameState.category,
             blueName: gameState.blueName,
@@ -306,7 +327,13 @@ function endMatch() {
             r1: gameState.roundsHistory[0] ? `${gameState.roundsHistory[0].blueScore}-${gameState.roundsHistory[0].redScore}` : "-",
             r2: gameState.roundsHistory[1] ? `${gameState.roundsHistory[1].blueScore}-${gameState.roundsHistory[1].redScore}` : "-",
             r3: gameState.roundsHistory[2] ? `${gameState.roundsHistory[2].blueScore}-${gameState.roundsHistory[2].redScore}` : "-"
-        });
+        };
+
+        // Guarda sempre no ficheiro local primeiro
+        saveLocalBackup(payload);
+
+        // Envia para o Google Sheets
+        sendResultsToGoogleSheet(payload);
     }
 }
 

@@ -24,32 +24,40 @@ body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    padding-top: 12vh;
 }
 
 .blue-zone { background-color: #0047BB; }
 .red-zone { background-color: #E21B22; }
 
-.athlete-name {
+.athlete-header {
     position: absolute;
-    top: 8vh;
+    top: 11vh;
     left: 0;
     width: 100%;
-    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px; 
     z-index: 5;
-    font-size: 3vw;
+}
+
+.athlete-name {
+    width: 100%;
+    text-align: center;
+    font-size: 3.5vw;
     text-transform: uppercase;
     text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
 }
-
 .score-big {
-    font-size: 25vw;
+    font-size: 27vw;
     line-height: 1;
     font-weight: 900;
     text-shadow: 5px 5px 10px rgba(0, 0, 0, 0.5);
 }
 
 .penalty-box {
-    margin-top: 20px;
+    margin-top: 40px;
     padding: 10px 20px;
     font-size: 2vw;
     background: rgba(0, 0, 0, 0.3);
@@ -58,8 +66,8 @@ body {
 
 .rounds-won-container {
     display: flex;
-    gap: 15px;
-    margin-bottom: 20px;
+    gap: 12px;
+    margin:0;
 }
 
 .round-dot {
@@ -245,13 +253,13 @@ input, select {
 }
 
 .center-controls {
-    width: 80px;
+    width: 60px;
     background: #222;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 5px;
-    padding: 5px;
+    align-items: center;
+    padding: 10px 5px;
     border-left: 2px solid #444;
     border-right: 2px solid #444;
 }
@@ -292,4 +300,12 @@ input, select {
 .main-action { background: #1a1a1a; color: #00ff00; }
 .next-action { color: #ffa500; }
 .reset-action { color: #ff4444; }
-.fs-action { flex: 0.5; font-size: 1.2rem; }
+.fs-action {
+    width: 100%;
+    height: 60px;
+    flex: none;
+    font-size: 1.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
