@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mesa Técnica - Controlo PC</title>
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="/socket.io.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -268,15 +268,55 @@
         .act-timer { background: #2ba640; color: #fff; }
         .act-round { background: #f39c12; color: #fff; }
         .act-reset { background: #c0392b; color: #fff; }
+
+        .tv-row { display: flex; gap: 10px; width: 94%; margin: 0 auto; align-items: stretch; flex-shrink: 0; }
+        .tv-row .video-box-wrapper { width: auto; flex: 1; min-width: 0; margin: 0; }
+        .manual-col { width: 104px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+        .manual-card { flex: 1; background: #212121; border: 1px solid #333; border-radius: 8px; padding: 6px; text-align: center; display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+        .m-blue { border-top: 7px solid #0047BB; }
+        .m-red { border-top: 7px solid #E21B22; }
+        .m-title { font-size: 0.7rem; font-weight: bold; color: #bbb; }
+        .m-score { font-size: 1.6rem; font-weight: bold; }
+        .m-btns { display: flex; gap: 6px; justify-content: center; }
+        .sq { width: 36px; height: 36px; border-radius: 6px; border: 1px solid #555; background: #111; color: #fff; font-size: 1.4rem; font-weight: bold; cursor: pointer; line-height: 1; padding: 0; }
+        .sq:hover { background: #333; }
+        .pen-undo { font-size: 0.65rem; padding: 4px; border-radius: 5px; border: 1px solid #6b3a3a; background: #2d1313; color: #ff9a9a; cursor: pointer; font-weight: bold; }
+        .pen-undo:disabled { opacity: 0.4; cursor: not-allowed; }
+        .act-var { grid-column: 1 / -1; background: #2980b9; color: #fff; font-size: 1rem; }
+        .act-var.active { background: #c0392b; }
+        .act-kyeshi { grid-column: 1 / -1; background: #8e44ad; color: #fff; }
+        .act-kyeshi.active { background: #27ae60; }
     </style>
 </head>
 <body>
 
     <div class="preview-pane">
-        <div class="video-box-wrapper">
+        <div class="tv-row">
+            <div class="manual-col">
+                <div class="manual-card m-blue">
+                    <div class="m-title">AZUL</div>
+                    <div class="m-score" id="mScoreBlue">0</div>
+                    <div class="m-btns">
+                        <button class="sq" onclick="manual('blue', -1)">−</button>
+                        <button class="sq" onclick="manual('blue', 1)">+</button>
+                    </div>
+                    <button class="pen-undo" id="undoPenBlue" onclick="removePenalty('blue')">− GAM-JEOM</button>
+                </div>
+                <div class="manual-card m-red">
+                    <div class="m-title">VERMELHO</div>
+                    <div class="m-score" id="mScoreRed">0</div>
+                    <div class="m-btns">
+                        <button class="sq" onclick="manual('red', -1)">−</button>
+                        <button class="sq" onclick="manual('red', 1)">+</button>
+                    </div>
+                    <button class="pen-undo" id="undoPenRed" onclick="removePenalty('red')">− GAM-JEOM</button>
+                </div>
+            </div>
+            <div class="video-box-wrapper">
             <div class="video-box" id="videoBox">
                 <iframe id="tvFrame" src="index.html"></iframe>
             </div>
+        </div>
         </div>
 
         <div class="history-card">
@@ -380,6 +420,8 @@
         </div>
 
         <div class="quick-actions">
+            <button class="btn-act act-var" id="btnVar" onclick="triggerAction('var')">📺 VAR</button>
+            <button class="btn-act act-kyeshi" id="btnKyeshi" onclick="triggerAction('kyeshi')">⛑ KYESHI (1 min)</button>
             <button class="btn-act act-timer" onclick="triggerAction('timer')">⏱ START / STOP</button>
             <button class="btn-act act-round" onclick="triggerAction('nextMatch')">➤ PRÓX. COMBATE</button>
             <button class="btn-act act-reset" onclick="triggerAction('reset')">↺ RESET</button>
@@ -467,6 +509,28 @@
             }
         }
 
+        function manual(color, delta) {
+            socket.emit('action', { type: 'manualScore', color: color, delta: delta });
+        }
+
+        function removePenalty(color) {
+            socket.emit('action', { type: 'removePenalty', color: color });
+        }
+
+        let kyeshiOn = false;
+        function fmtTime(t) {
+            return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+        }
+        socket.on('updateTimer', (t) => {
+            if (kyeshiOn) document.getElementById('btnKyeshi').innerText = `⛑ KYESHI ${fmtTime(t)} — CANCELAR`;
+        });
+
+        // tirar o foco dos botões para o Espaço não os voltar a clicar
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('button');
+            if (b) b.blur();
+        });
+
         function decideWinner(color) {
             socket.emit('action', { type: 'refereeDecision', color: color });
         }
@@ -551,6 +615,16 @@
             if (refereeBox) {
                 refereeBox.style.display = (state.mode === 'referee_decision') ? 'block' : 'none';
             }
+
+            document.getElementById('mScoreBlue').innerText = state.blueScore;
+            document.getElementById('mScoreRed').innerText = state.redScore;
+            const bv = document.getElementById('btnVar');
+            bv.classList.toggle('active', !!state.varActive);
+            bv.innerText = state.varActive ? '📺 VAR — CONTINUAR' : '📺 VAR';
+            kyeshiOn = !!state.kyeshiActive;
+            const bk = document.getElementById('btnKyeshi');
+            bk.classList.toggle('active', kyeshiOn);
+            bk.innerText = kyeshiOn ? `⛑ KYESHI ${fmtTime(state.kyeshiTime)} — CANCELAR` : '⛑ KYESHI (1 min)';
 
             const isLocked = state.matchStarted && !state.matchOver;
             btnUpdate.disabled = isLocked;

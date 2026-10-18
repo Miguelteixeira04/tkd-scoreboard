@@ -2,11 +2,23 @@
   "name": "tkd-scoreboard",
   "version": "1.0.0",
   "main": "server.js",
+  "bin": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "pkg . --output tkd-scoreboard.exe"
   },
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.7.2"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.23.0"
+  },
+  "pkg": {
+  "assets": [
+    "public/**/*",
+    "node_modules/socket.io/client-dist/**/*"
+  ],
+  "targets": ["node22-win-x64"]
   }
 }

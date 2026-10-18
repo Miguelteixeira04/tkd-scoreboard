@@ -5,14 +5,29 @@ const http = require('http');
 const os = require('os');
 const fs = require('fs'); 
 
+const baseDir = process.pkg ? path.dirname(process.execPath) : __dirname;
+
+let config = { port: 3000, googleSheetUrl: "" };
+try {
+    config = { ...config, ...JSON.parse(fs.readFileSync(path.join(baseDir, 'config.json'), 'utf8')) };
+} catch (e) {}
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Google Apps Script
+// Google Apps Script - Torneio
 const GOOGLE_SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycby8blztNilj0hPr3zqI8K9VR-IWrZ4IBneFRkEtgKTqrg-UUw4BKv8bSUHKulp7BmNE/exec";
 
+//Google Apps Script - Treinos
+//const GOOGLE_SHEET_TRAINING_URL = "https://script.google.com/macros/s/AKfycbziOWRd5Kf4_4kDSxL3g6z6EOfIXLlAjgsIvCyqASuZvFZxVPOhCCifFwEfT89lTwQp/exec";
+
 app.use(express.static(path.join(__dirname, 'public')));
+
+const POINT_GAP = 15;          // diferença de pontos que termina o round
+const GOLDEN_POINT_TIME = 30;  // segundos do ponto de ouro
+const KYESHI_TIME = 60;        // segundos de assistência médica
+const MAX_PENALTIES = 5;       // gam-jeom que fazem perder o round
 
 let gameState = {
     area: "A",
@@ -46,7 +61,11 @@ let gameState = {
     isGoldenPoint: false,
     winnerData: null,
     roundsHistory: [],
-    sheetSent: false
+    sheetSent: false,
+    sheetResend: false,
+    kyeshiActive: false,
+    kyeshiTime: 0,
+    varActive: false
 };
 
 io.on('connection', (socket) => {
@@ -66,10 +85,10 @@ io.on('connection', (socket) => {
     });
 
     socket.on('action', (data) => {
-        if (gameState.matchOver && data.type !== 'reset' && data.type !== 'nextMatch') return;
+        if (gameState.matchOver && !['reset', 'nextMatch', 'manualScore', 'removePenalty', 'var'].includes(data.type)) return;
 
         if (data.type === 'score') {
-            if (gameState.mode === 'rest' || gameState.mode === 'referee_decision') return;
+            if (gameState.mode === 'rest' || gameState.mode === 'referee_decision' || gameState.kyeshiActive || gameState.varActive) return;
             gameState.matchStarted = true;
             
             if (data.color === 'blue') {
@@ -83,6 +102,7 @@ io.on('connection', (socket) => {
                 if (data.actionKind === 'turning') gameState.redTurningKicks++;
             }
             io.emit('playSound', 'point');
+            checkPointGap();
 
             if (gameState.isGoldenPoint && (gameState.blueScore > 0 || gameState.redScore > 0)) {
                 gameState.isRunning = false;
@@ -90,7 +110,7 @@ io.on('connection', (socket) => {
             }
 
         } else if (data.type === 'penalty') {
-            if (gameState.mode === 'rest' || gameState.mode === 'referee_decision') return;
+            if (gameState.mode === 'rest' || gameState.mode === 'referee_decision' || gameState.kyeshiActive || gameState.varActive) return;
             gameState.matchStarted = true;
             if (data.color === 'blue') {
                 gameState.bluePenalty += 1;
@@ -101,6 +121,7 @@ io.on('connection', (socket) => {
                 gameState.blueScore += 1;
             }
             io.emit('playSound', 'point');
+            checkPointGap();
 
             if (gameState.isGoldenPoint && (gameState.blueScore > 0 || gameState.redScore > 0)) {
                 gameState.isRunning = false;
@@ -108,7 +129,7 @@ io.on('connection', (socket) => {
             }
 
         } else if (data.type === 'timer') {
-            if (gameState.mode === 'referee_decision') return;
+            if (gameState.mode === 'referee_decision' || gameState.kyeshiActive || gameState.varActive) return;
             gameState.isRunning = !gameState.isRunning;
             if (gameState.isRunning) gameState.matchStarted = true;
 
@@ -122,6 +143,14 @@ io.on('connection', (socket) => {
                 awardRound(data.color, 'Decisão do Árbitro (+3)');
             }
 
+        } else if (data.type === 'manualScore') {
+            manualAdjust(data.color, data.delta);
+        } else if (data.type === 'removePenalty') {
+            removePenalty(data.color);
+        } else if (data.type === 'var') {
+            gameState.varActive = !gameState.varActive;
+        } else if (data.type === 'kyeshi') {
+            toggleKyeshi();
         } else if (data.type === 'nextRound') {
             forceNextRound();
         } else if (data.type === 'nextMatch') {
@@ -138,6 +167,112 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 });
+
+// ---------- POINT GAP ----------
+function checkPointGap() {
+    if (gameState.mode !== 'round' || gameState.matchOver) return;
+
+    // 5.º gam-jeom: o round acaba e o adversário ganha
+    if (gameState.bluePenalty >= MAX_PENALTIES || gameState.redPenalty >= MAX_PENALTIES) {
+        gameState.isRunning = false;
+        awardRound(gameState.bluePenalty >= MAX_PENALTIES ? 'red' : 'blue', `${MAX_PENALTIES} Gam-jeom`);
+        return;
+    }
+
+    if (gameState.isGoldenPoint) return;
+    const diff = gameState.blueScore - gameState.redScore;
+    if (Math.abs(diff) >= POINT_GAP) {
+        gameState.isRunning = false;
+        awardRound(diff > 0 ? 'blue' : 'red', `Point Gap (${POINT_GAP})`);
+    }
+}
+
+// ---------- CORREÇÕES MANUAIS ----------
+// Se o round acabou (intervalo ou fim de combate), as correções aplicam-se ao último round.
+function finishedTarget() {
+    const finished = (gameState.mode === 'rest' || gameState.matchOver) && gameState.roundsHistory.length > 0;
+    return finished ? gameState.roundsHistory[gameState.roundsHistory.length - 1] : null;
+}
+
+function manualAdjust(color, delta) {
+    if (color !== 'blue' && color !== 'red') return;
+    delta = delta > 0 ? 1 : -1;
+    const key = color + 'Score';
+    const entry = finishedTarget();
+    if (entry) {
+        entry[key] = Math.max(0, entry[key] + delta);
+        applyFinishedEdit(entry);
+        return;
+    }
+    gameState[key] = Math.max(0, gameState[key] + delta);
+    if (gameState.mode !== 'round') return;
+    if (gameState.isGoldenPoint) {
+        if (gameState.blueScore !== gameState.redScore) {
+            gameState.isRunning = false;
+            awardRound(gameState.blueScore > gameState.redScore ? 'blue' : 'red', 'Ponto de Ouro (Manual)');
+        }
+    } else {
+        checkPointGap();
+    }
+}
+
+function removePenalty(color) {
+    if (color !== 'blue' && color !== 'red') return;
+    const opp = color === 'blue' ? 'red' : 'blue';
+    const entry = finishedTarget();
+    const t = entry || gameState;
+    t[color + 'Penalty'] = Math.max(0, t[color + 'Penalty'] - 1);
+    t[opp + 'Score'] = Math.max(0, t[opp + 'Score'] - 1);
+    if (entry) applyFinishedEdit(entry);
+}
+
+// Recalcula vencedor do round, rounds ganhos e se o combate deve terminar/reabrir
+function applyFinishedEdit(h) {
+    if (h.bluePenalty >= MAX_PENALTIES) h.winner = 'red';
+    else if (h.redPenalty >= MAX_PENALTIES) h.winner = 'blue';
+    else if (h.blueScore > h.redScore) h.winner = 'blue';
+    else if (h.redScore > h.blueScore) h.winner = 'red';
+    else if (h.bluePenalty !== h.redPenalty) h.winner = h.bluePenalty < h.redPenalty ? 'blue' : 'red';
+    else if ((h.blueHeadKicks || 0) !== (h.redHeadKicks || 0)) h.winner = h.blueHeadKicks > h.redHeadKicks ? 'blue' : 'red';
+    else if ((h.blueTurningKicks || 0) !== (h.redTurningKicks || 0)) h.winner = h.blueTurningKicks > h.redTurningKicks ? 'blue' : 'red';
+    // empate total: mantém o vencedor anterior
+    if (!String(h.method || '').includes('Corrigido')) h.method = (h.method || '') + ' [Corrigido]';
+
+    gameState.blueScore = h.blueScore;
+    gameState.redScore = h.redScore;
+    gameState.bluePenalty = h.bluePenalty;
+    gameState.redPenalty = h.redPenalty;
+    gameState.blueRoundsWon = gameState.roundsHistory.filter(r => r.winner === 'blue').length;
+    gameState.redRoundsWon = gameState.roundsHistory.filter(r => r.winner === 'red').length;
+
+    const winsNeeded = Math.ceil(gameState.maxRounds / 2);
+    const shouldEnd = gameState.blueRoundsWon >= winsNeeded || gameState.redRoundsWon >= winsNeeded
+        || gameState.roundsHistory.length >= gameState.maxRounds;
+
+    if (shouldEnd) {
+        endMatch(gameState.matchOver);
+    } else if (gameState.matchOver) {
+        // o combate afinal não tinha acabado: reabre e vai para o intervalo
+        gameState.matchOver = false;
+        gameState.winnerData = null;
+        gameState.sheetSent = false;
+        gameState.sheetResend = true;
+        startRestMode();
+    }
+}
+
+// ---------- KYESHI ----------
+function toggleKyeshi() {
+    if (gameState.matchOver || gameState.varActive) return;
+    if (gameState.kyeshiActive) {
+        gameState.kyeshiActive = false;
+        gameState.kyeshiTime = 0;
+    } else {
+        gameState.kyeshiActive = true;
+        gameState.kyeshiTime = KYESHI_TIME;
+        gameState.isRunning = false;
+    }
+}
 
 function evaluateRound() {
     if (gameState.blueScore > gameState.redScore) return 'blue';
@@ -169,7 +304,7 @@ function startGoldenPoint() {
     gameState.blueTurningKicks = 0;
     gameState.redTurningKicks = 0;
     
-    gameState.time = 20;
+    gameState.time = GOLDEN_POINT_TIME;
     gameState.isRunning = false;
     io.emit('updateState', gameState);
 }
@@ -198,6 +333,10 @@ function awardRound(winnerColor, method = '') {
         redScore: finalRoundRed,
         bluePenalty: gameState.bluePenalty,
         redPenalty: gameState.redPenalty,
+        blueHeadKicks: gameState.blueHeadKicks,
+        redHeadKicks: gameState.redHeadKicks,
+        blueTurningKicks: gameState.blueTurningKicks,
+        redTurningKicks: gameState.redTurningKicks,
         winner: winnerColor,
         method: method
     });
@@ -275,7 +414,7 @@ function saveLocalBackup(payload) {
             ...payload
         };
         fs.appendFileSync(
-            path.join(__dirname, 'backup_combates.jsonl'),
+            path.join(baseDir, 'backup_combates.jsonl'),
             JSON.stringify(backupEntry) + '\n',
             'utf8'
         );
@@ -298,7 +437,7 @@ function sendResultsToGoogleSheet(payload) {
     .catch(err => console.error("❌ Erro Google Sheets:", err));
 }
 
-function endMatch() {
+function endMatch(correction = false) {
     gameState.matchOver = true;
     gameState.isRunning = false;
     gameState.matchStarted = false;
@@ -316,10 +455,11 @@ function endMatch() {
     
     io.emit('matchEnded', gameState.winnerData);
 
-    if (!gameState.sheetSent && gameState.roundsHistory.length > 0) {
+    if ((!gameState.sheetSent || correction) && gameState.roundsHistory.length > 0) {
         gameState.sheetSent = true;
         const payload = {
             matchNumber: `${gameState.matchNumber}${gameState.area || 'A'}`,
+            correcao: !!(correction || gameState.sheetResend),
             category: gameState.category,
             blueName: gameState.blueName,
             redName: gameState.redName,
@@ -360,9 +500,26 @@ function resetMatch() {
     gameState.mode = 'round';
     gameState.roundsHistory = [];
     gameState.sheetSent = false;
+    gameState.sheetResend = false;
+    gameState.kyeshiActive = false;
+    gameState.kyeshiTime = 0;
+    gameState.varActive = false;
 }
 
 setInterval(() => {
+    if (gameState.varActive) return; // VAR: tudo congelado
+    if (gameState.kyeshiActive) {
+        gameState.kyeshiTime--;
+        if (gameState.kyeshiTime <= 0) {
+            gameState.kyeshiTime = 0;
+            gameState.kyeshiActive = false;
+            io.emit('playSound', 'end');
+            io.emit('updateState', gameState);
+        } else {
+            io.emit('updateTimer', gameState.kyeshiTime);
+        }
+        return;
+    }
     if (gameState.isRunning && gameState.time > 0) {
         gameState.time--;
         io.emit('updateTimer', gameState.time);
@@ -391,12 +548,12 @@ function getLocalIpAddress() {
     return '127.0.0.1';
 }
 
-server.listen(3000, '0.0.0.0', () => {
+server.listen(config.port, '0.0.0.0', () => {
     const localIp = getLocalIpAddress();
     console.log('\n==========================================');
     console.log('🥋 TKD SCOREBOARD ATIVO');
-    console.log('💻 Painel do PC (Admin):    http://localhost:3000/admin.html');
-    console.log('📺 Ecrã da TV (Scoreboard):  http://localhost:3000/');
-    console.log(`📱 Comando Telemóvel:       http://${localIp}:3000/remote.html`);
+    console.log('💻 Painel do PC (Admin):    http://localhost:' + config.port + '/admin.html');
+    console.log('📺 Ecrã da TV (Scoreboard):  http://localhost:' + config.port + '/');
+    console.log(`📱 Comando Telemóvel:       http://${localIp}:${config.port}/remote.html`);
     console.log('==========================================\n');
 });

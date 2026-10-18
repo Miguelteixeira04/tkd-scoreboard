@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Scoreboard TKD</title>
     <link rel="stylesheet" href="style.css">
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="/socket.io.min.js"></script>
     <style>
         .match-badge {
             position: absolute;
@@ -19,6 +19,28 @@
             letter-spacing: 1px;
             text-transform: uppercase;
             font-weight: bold;
+        }
+
+        body.kyeshi-on::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            border: 14px solid #2ecc71; /* mesma cor do contador do Kyeshi */
+            box-sizing: border-box;
+            pointer-events: none;
+            z-index: 50;
+            animation: kyeshiBlink 1s infinite;
+        }
+        @keyframes kyeshiBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.1; } }
+
+        body.var-on::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            border: 14px solid #3ea6ff;
+            box-sizing: border-box;
+            pointer-events: none;
+            z-index: 50;
         }
     </style>
 </head>
@@ -112,7 +134,15 @@
             document.getElementById('penBlue').innerText = data.bluePenalty;
             document.getElementById('penRed').innerText = data.redPenalty;
             
-            if (data.mode === 'rest') {
+            document.body.classList.toggle('kyeshi-on', !!data.kyeshiActive);
+            document.body.classList.toggle('var-on', !!data.varActive);
+            if (data.varActive) {
+                centerPanel.classList.remove('rest-active');
+                document.getElementById('roundLabel').innerHTML = "<span style='color: #3ea6ff; font-size: 44px;'>VAR</span>";
+            } else if (data.kyeshiActive) {
+                centerPanel.classList.remove('rest-active');
+                document.getElementById('roundLabel').innerHTML = "<span style='color: #2ecc71; font-size: 30px;'>KYESHI</span>";
+            } else if (data.mode === 'rest') {
                 centerPanel.classList.add('rest-active');
                 document.getElementById('roundLabel').innerHTML = "INTERVALO";
             } else if (data.isGoldenPoint) {
@@ -126,7 +156,8 @@
                 document.getElementById('roundLabel').innerHTML = 'ROUND <span id="round">' + data.currentRound + '</span>';
             }
 
-            document.getElementById('timer').innerText = formatTime(data.time);
+            document.getElementById('timer').innerText = formatTime(data.kyeshiActive ? data.kyeshiTime : data.time);
+            document.getElementById('timer').style.color = data.kyeshiActive ? '#2ecc71' : '';
             
             updateDots('blueRounds', data.maxRounds, data.blueRoundsWon);
             updateDots('redRounds', data.maxRounds, data.redRoundsWon);

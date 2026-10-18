@@ -1,0 +1,41 @@
+# Dependências
+node_modules/
+
+# Executáveis gerados pelo pkg
+*.exe
+dist/
+build/
+.pkg-cache/
+
+# Dados gerados pela app (resultados dos combates)
+backup_combates.jsonl
+*.jsonl
+
+# Configuração local
+config.json
+.env
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Cache e ficheiros temporários
+.npm/
+.cache/
+*.tmp
+*.bak
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores / IDEs
+.vscode/
+.vs/
+.idea/
+*.suo
+*.user
