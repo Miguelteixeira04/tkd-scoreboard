@@ -344,6 +344,12 @@
         <h2>
             Gestão de Combate
             <div class="match-badge-ctrl">
+                <span>Torneio:</span>
+                <select id="tournamentNum" style="width: 58px; font-weight: bold;">
+                    <option value="1" selected>T1</option> <!-- ALTERAR AQUI TORNEIO PARA TORNEIO -->
+                    <option value="2">T2</option>
+                    <option value="3">T3</option>
+                </select>
                 <span>Área:</span>
                 <select id="courtArea">
                     <option value="A" selected>A</option>
@@ -549,6 +555,7 @@
             const categoryString = `${divLabel} ${gen} ${wei}`;
 
             const config = {
+                tournament: parseInt(document.getElementById('tournamentNum').value) || 1,
                 area: document.getElementById('courtArea').value,
                 matchNumber: document.getElementById('matchNumber').value,
                 category: categoryString,
@@ -595,6 +602,11 @@
         }
 
         socket.on('updateState', (state) => {
+
+            if (document.activeElement !== document.getElementById('tournamentNum') && state.tournament) {
+                document.getElementById('tournamentNum').value = state.tournament;
+            }
+            
             if (document.activeElement !== document.getElementById('courtArea') && state.area) {
                 document.getElementById('courtArea').value = state.area;
             }

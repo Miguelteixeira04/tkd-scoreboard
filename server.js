@@ -17,7 +17,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // Google Apps Script - Torneio
-const GOOGLE_SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycby8blztNilj0hPr3zqI8K9VR-IWrZ4IBneFRkEtgKTqrg-UUw4BKv8bSUHKulp7BmNE/exec";
+const GOOGLE_SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwy5PLb5i8hWukhROe7Xzrpy4xUu6LxqqqkeQwZSnv-yXp8WRTYOlXx27bomaRbT9Sm/exec";
 
 //Google Apps Script - Treinos
 //const GOOGLE_SHEET_TRAINING_URL = "https://script.google.com/macros/s/AKfycbziOWRd5Kf4_4kDSxL3g6z6EOfIXLlAjgsIvCyqASuZvFZxVPOhCCifFwEfT89lTwQp/exec";
@@ -30,11 +30,12 @@ const KYESHI_TIME = 60;        // segundos de assistência médica
 const MAX_PENALTIES = 5;       // gam-jeom que fazem perder o round
 
 let gameState = {
+    tournament: 1,
     area: "A",
     matchNumber: 1,
     category: "Sénior M -68kg",
-    blueName: "HONG",
-    redName: "CHUNG",
+    blueName: "AZUL",
+    redName: "VERMELHO",
     blueScore: 0,
     redScore: 0,
     bluePenalty: 0,
@@ -72,6 +73,7 @@ io.on('connection', (socket) => {
     socket.emit('updateState', gameState);
 
     socket.on('updateSettings', (data) => {
+        if (data.tournament) gameState.tournament = parseInt(data.tournament);
         if (data.area) gameState.area = data.area;
         if (data.matchNumber) gameState.matchNumber = parseInt(data.matchNumber);
         if (data.category) gameState.category = data.category;
@@ -455,10 +457,14 @@ function endMatch(correction = false) {
     
     io.emit('matchEnded', gameState.winnerData);
 
-    if ((!gameState.sheetSent || correction) && gameState.roundsHistory.length > 0) {
+   if ((!gameState.sheetSent || correction) && gameState.roundsHistory.length > 0) {
         gameState.sheetSent = true;
+
+        // Formato: T1_A1, T1_A2...
+        const formattedMatchId = `T${gameState.tournament || 1}_${gameState.area || 'A'}${gameState.matchNumber}`;
+
         const payload = {
-            matchNumber: `${gameState.matchNumber}${gameState.area || 'A'}`,
+            matchNumber: formattedMatchId,
             correcao: !!(correction || gameState.sheetResend),
             category: gameState.category,
             blueName: gameState.blueName,
