@@ -1,0 +1,30 @@
+Miguel Teixeira;Sénior;M;-80 Kg;TCVR
+Rodrigo do Cabo;Cadete;F;+65 Kg;TCVR
+Beatriz Monteiro;Sénior;F;-57 Kg;TCVR
+Pedro Pinto;Sénior;M;+87 Kg;TCVR
+Francisco Calejo;Sénior;M;-87 Kg;TCVR
+Raul Sanchez;Júnior;M;-63 Kg;TCVR
+Diogo Costa;Sénior;M;-80 Kg;TCVR
+Diogo Fonseca;Sénior;M;-68 Kg;TCVR
+Isaac Santos;Júnior;M;-63 Kg;TCVR
+Lucas Florindo;Cadete;M;-57 Kg;TCVR
+Joel Martins;Sénior;M;-74 Kg;TCVR
+Camila Ribeiro;Júnior;F;-55 Kg;TCVR
+Rodrigo Charrão;Sénior;M;+87 Kg;TCVR
+Leonor Ribeiro;Cadete;F;+59 Kg;TCVR
+Tomás Laranjeira;Cadete;M;+65 Kg;TCVR
+Catarina Silva;Sénior;F;-62 Kg;TCVR
+Francisco Costa;Cadete;M;+65 Kg;TCVR
+Guanji;Cadete;M;-53 Kg;TCVR
+Beatriz Eira;Sénior;F;-67 Kg;TCVR
+Rafael Ribeiro;Infantil;;;TCVR
+Diana Mariani;Infantil;F;-30 Kg;TCVR
+Carolina Vidal;Benjamim;F;-28 Kg;TCVR
+Gabriela Pádua;Infantil;F;-45 Kg;TCVR
+João Costa;Infantil;M;+45 Kg;TCVR
+Miguel Sequeira;Infantil;M;+45 Kg;TCVR
+Gustavo Abobeleira;Benjamim;M;-28 Kg;TCVR
+Beatriz Carriço;Infantil;F;+45 Kg;TCVR
+Maria Clara Salgado;Benjamim;F;-24 Kg;TCVR
+Maria Inês Salgado;Infantil;F;-30 Kg;TCVR
+Luísa;Infantil;F;-27 Kg;TCVR

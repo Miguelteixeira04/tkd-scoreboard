@@ -158,6 +158,18 @@
             border: 1px solid #3a3a3a;
         }
 
+        .friendly-badge {
+            display: none;
+            background: #d35400;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            text-align: center;
+            font-size: 0.85rem;
+            border: 1px solid #e67e22;
+        }
+
         .athlete-card {
             padding: 8px 12px;
             border-radius: 8px;
@@ -173,6 +185,26 @@
             background: rgba(226, 27, 34, 0.25); 
             border-left: 5px solid #E21B22; 
         }
+
+        .selector-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .btn-cancel-search {
+            display: none;
+            background: #444;
+            color: #fff;
+            border: 1px solid #666;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        .btn-cancel-search:hover { background: #555; }
 
         label { 
             font-size: 0.75rem; 
@@ -286,9 +318,70 @@
         .act-var.active { background: #c0392b; }
         .act-kyeshi { grid-column: 1 / -1; background: #8e44ad; color: #fff; }
         .act-kyeshi.active { background: #27ae60; }
+
+        /* MODAL AMIGÁVEL */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-box {
+            background: #252525;
+            border: 2px solid #e67e22;
+            border-radius: 12px;
+            padding: 24px;
+            width: 420px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+        .modal-box h3 {
+            margin-top: 0;
+            color: #f39c12;
+            font-size: 1.3rem;
+        }
+        .modal-box p {
+            font-size: 1.05rem;
+            color: #ddd;
+            margin: 16px 0 24px;
+            line-height: 1.4;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+        }
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .btn-yes { background: #27ae60; color: #fff; }
+        .btn-no { background: #c0392b; color: #fff; }
     </style>
 </head>
 <body>
+
+    <!-- MODAL CONFIRMAÇÃO AMIGÁVEL -->
+    <div id="friendlyModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3>⚠️ Atleta de Categoria Diferente</h3>
+            <p><strong>É um combate AMIGÁVEL?</strong><br><small style="color: #aaa;">(Combates pedagógicos não pontuam na tabela oficial)</small></p>
+            <div class="modal-actions">
+                <button class="modal-btn btn-yes" onclick="confirmFriendly(true)">SIM</button>
+                <button class="modal-btn btn-no" onclick="confirmFriendly(false)">NÃO</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DATALIST GLOBAL DE ATLETAS -->
+    <datalist id="allAthletesDatalist"></datalist>
 
     <div class="preview-pane">
         <div class="tv-row">
@@ -313,10 +406,10 @@
                 </div>
             </div>
             <div class="video-box-wrapper">
-            <div class="video-box" id="videoBox">
-                <iframe id="tvFrame" src="index.html"></iframe>
+                <div class="video-box" id="videoBox">
+                    <iframe id="tvFrame" src="index.html"></iframe>
+                </div>
             </div>
-        </div>
         </div>
 
         <div class="history-card">
@@ -346,7 +439,7 @@
             <div class="match-badge-ctrl">
                 <span>Torneio:</span>
                 <select id="tournamentNum" style="width: 58px; font-weight: bold;">
-                    <option value="1" selected>T1</option> <!-- ALTERAR AQUI TORNEIO PARA TORNEIO -->
+                    <option value="1" selected>T1</option>
                     <option value="2">T2</option>
                     <option value="3">T3</option>
                 </select>
@@ -359,6 +452,9 @@
                 <input type="number" id="matchNumber" value="1" min="1">
             </div>
         </h2>
+
+        <!-- INDICADOR VISUAL DE AMIGÁVEL -->
+        <div id="friendlyBadge" class="friendly-badge">🤝 COMBATE AMIGÁVEL (NÃO PONTUA NA TABELA)</div>
 
         <!-- CATEGORIA / ESCALÃO / GÉNERO / PESO -->
         <div class="category-grid">
@@ -382,18 +478,30 @@
             </div>
             <div>
                 <label for="weight">Peso</label>
-                <select id="weight"></select>
+                <select id="weight" onchange="onCategoryChanged()"></select>
             </div>
         </div>
 
+        <!-- ATLETA AZUL -->
         <div class="athlete-card card-blue">
-            <label for="blueName">Atleta Azul (Chung)</label>
-            <input type="text" id="blueName" placeholder="Nome do Atleta Azul" value="HONG">
+            <label for="selectBlue">Atleta Azul (Chung)</label>
+            <div class="selector-row">
+                <select id="selectBlue" onchange="onAthleteSelect('blue')"></select>
+                <input type="text" id="inputSearchBlue" list="allAthletesDatalist" placeholder="🔍 Escrever nome do atleta..." style="display:none;" oninput="onSearchInput('blue')">
+                <button type="button" id="btnCancelBlue" class="btn-cancel-search" onclick="cancelSearch('blue')">✕ Lista</button>
+            </div>
+            <input type="hidden" id="blueName" value="AZUL">
         </div>
 
+        <!-- ATLETA VERMELHO -->
         <div class="athlete-card card-red">
-            <label for="redName">Atleta Vermelho (Hong)</label>
-            <input type="text" id="redName" placeholder="Nome do Atleta Vermelho" value="CHUNG">
+            <label for="selectRed">Atleta Vermelho (Hong)</label>
+            <div class="selector-row">
+                <select id="selectRed" onchange="onAthleteSelect('red')"></select>
+                <input type="text" id="inputSearchRed" list="allAthletesDatalist" placeholder="🔍 Escrever nome do atleta..." style="display:none;" oninput="onSearchInput('red')">
+                <button type="button" id="btnCancelRed" class="btn-cancel-search" onclick="cancelSearch('red')">✕ Lista</button>
+            </div>
+            <input type="hidden" id="redName" value="VERMELHO">
         </div>
 
         <div class="config-grid">
@@ -440,6 +548,11 @@
         const box = document.getElementById('videoBox');
         const btnUpdate = document.getElementById('btnUpdateMatch');
         const refereeBox = document.getElementById('refereeBox');
+        const friendlyModal = document.getElementById('friendlyModal');
+        const friendlyBadge = document.getElementById('friendlyBadge');
+
+        let allAthletes = [];
+        let isFriendlyMatch = false;
 
         const WEIGHT_DATA = {
             Benjamins: {
@@ -474,6 +587,19 @@
             }
         };
 
+        function normalizeStr(str) {
+            return (str || "").toString().trim().toLowerCase()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                .replace(/\s+/g, "");
+        }
+
+        socket.on('athletesList', (list) => {
+            allAthletes = list;
+            const dl = document.getElementById('allAthletesDatalist');
+            dl.innerHTML = allAthletes.map(a => `<option value="${a.name}">${a.name} [${a.division} ${a.gender} ${a.weight}] (${a.club || 'Ind'})</option>`).join('');
+            populateAthleteSelectors();
+        });
+
         function onCategoryChanged() {
             const div = document.getElementById('division').value;
             const gen = document.getElementById('gender').value;
@@ -486,10 +612,147 @@
 
             const weightSelect = document.getElementById('weight');
             const weights = cat[gen] || [];
+            
+            const prevWeight = weightSelect.value;
             weightSelect.innerHTML = weights.map(w => `<option value="${w}">${w}</option>`).join('');
+            if (weights.includes(prevWeight)) {
+                weightSelect.value = prevWeight;
+            }
+
+            isFriendlyMatch = false;
+            updateFriendlyUI();
+            populateAthleteSelectors();
         }
 
-        onCategoryChanged();
+        function isSameCategory(ath, targetDiv, targetGen, targetWei) {
+            const aDiv = normalizeStr(ath.division);
+            const tDiv = normalizeStr(targetDiv);
+            const matchDiv = aDiv.includes(tDiv) || tDiv.includes(aDiv);
+            const matchGen = normalizeStr(ath.gender) === normalizeStr(targetGen);
+            const matchWei = normalizeStr(ath.weight) === normalizeStr(targetWei);
+            return matchDiv && matchGen && matchWei;
+        }
+
+        function populateAthleteSelectors() {
+            const curDiv = document.getElementById('division').value;
+            const curGen = document.getElementById('gender').value;
+            const curWei = document.getElementById('weight').value;
+
+            const filtered = allAthletes.filter(a => isSameCategory(a, curDiv, curGen, curWei));
+
+            function buildOptions(currentVal) {
+                let html = '<option value="">-- Selecionar Atleta --</option>';
+                if (filtered.length > 0) {
+                    filtered.forEach(a => {
+                        const sel = (a.name === currentVal) ? 'selected' : '';
+                        html += `<option value="${a.name}" data-type="same" ${sel}>${a.name} (${a.club || 'Ind'})</option>`;
+                    });
+                } else {
+                    html += `<option value="" disabled>(Nenhum atleta nesta categoria)</option>`;
+                }
+                html += `<option value="__search_input__">🔍 Procurar outros atletas (escrever)...</option>`;
+                return html;
+            }
+
+            const curBlue = document.getElementById('blueName').value;
+            const curRed = document.getElementById('redName').value;
+
+            document.getElementById('selectBlue').innerHTML = buildOptions(curBlue);
+            document.getElementById('selectRed').innerHTML = buildOptions(curRed);
+            
+            if (curBlue && filtered.some(a => a.name === curBlue)) {
+                document.getElementById('selectBlue').value = curBlue;
+            }
+            if (curRed && filtered.some(a => a.name === curRed)) {
+                document.getElementById('selectRed').value = curRed;
+            }
+        }
+
+        function onAthleteSelect(color) {
+            const select = document.getElementById(color === 'blue' ? 'selectBlue' : 'selectRed');
+            const searchInput = document.getElementById(color === 'blue' ? 'inputSearchBlue' : 'inputSearchRed');
+            const btnCancel = document.getElementById(color === 'blue' ? 'btnCancelBlue' : 'btnCancelRed');
+            const hidden = document.getElementById(color === 'blue' ? 'blueName' : 'redName');
+            const val = select.value;
+
+            if (val === '__search_input__') {
+                select.style.display = 'none';
+                searchInput.style.display = 'block';
+                btnCancel.style.display = 'block';
+                searchInput.value = '';
+                searchInput.focus();
+                return;
+            }
+
+            hidden.value = val;
+            checkFriendlies();
+        }
+
+        function cancelSearch(color) {
+            const select = document.getElementById(color === 'blue' ? 'selectBlue' : 'selectRed');
+            const searchInput = document.getElementById(color === 'blue' ? 'inputSearchBlue' : 'inputSearchRed');
+            const btnCancel = document.getElementById(color === 'blue' ? 'btnCancelBlue' : 'btnCancelRed');
+            const hidden = document.getElementById(color === 'blue' ? 'blueName' : 'redName');
+
+            searchInput.style.display = 'none';
+            btnCancel.style.display = 'none';
+            select.style.display = 'block';
+            select.value = "";
+            hidden.value = "";
+            checkFriendlies();
+        }
+
+        function onSearchInput(color) {
+            const searchInput = document.getElementById(color === 'blue' ? 'inputSearchBlue' : 'inputSearchRed');
+            const hidden = document.getElementById(color === 'blue' ? 'blueName' : 'redName');
+            const val = searchInput.value.trim();
+            
+            const match = allAthletes.find(a => a.name.toLowerCase() === val.toLowerCase());
+            if (match) {
+                hidden.value = match.name;
+                const curDiv = document.getElementById('division').value;
+                const curGen = document.getElementById('gender').value;
+                const curWei = document.getElementById('weight').value;
+                
+                if (!isSameCategory(match, curDiv, curGen, curWei)) {
+                    friendlyModal.style.display = 'flex';
+                } else {
+                    checkFriendlies();
+                }
+            } else {
+                hidden.value = val;
+            }
+        }
+
+        function confirmFriendly(isFriendly) {
+            friendlyModal.style.display = 'none';
+            isFriendlyMatch = isFriendly;
+            updateFriendlyUI();
+        }
+
+        function checkFriendlies() {
+            const bName = document.getElementById('blueName').value;
+            const rName = document.getElementById('redName').value;
+            const curDiv = document.getElementById('division').value;
+            const curGen = document.getElementById('gender').value;
+            const curWei = document.getElementById('weight').value;
+
+            const bAth = allAthletes.find(a => a.name === bName);
+            const rAth = allAthletes.find(a => a.name === rName);
+
+            let isDiff = false;
+            if (bAth && !isSameCategory(bAth, curDiv, curGen, curWei)) isDiff = true;
+            if (rAth && !isSameCategory(rAth, curDiv, curGen, curWei)) isDiff = true;
+
+            if (!isDiff) {
+                isFriendlyMatch = false;
+                updateFriendlyUI();
+            }
+        }
+
+        function updateFriendlyUI() {
+            friendlyBadge.style.display = isFriendlyMatch ? 'block' : 'none';
+        }
 
         function updateScale() {
             if (!box || !frame) return;
@@ -503,8 +766,8 @@
 
         function triggerAction(actionType) {
             if (actionType === 'nextMatch') {
-                const blue = document.getElementById('blueName').value.trim() || 'HONG';
-                const red = document.getElementById('redName').value.trim() || 'CHUNG';
+                const blue = document.getElementById('blueName').value.trim() || 'AZUL';
+                const red = document.getElementById('redName').value.trim() || 'VERMELHO';
                 socket.emit('action', { 
                     type: 'nextMatch',
                     blueName: blue,
@@ -531,7 +794,6 @@
             if (kyeshiOn) document.getElementById('btnKyeshi').innerText = `⛑ KYESHI ${fmtTime(t)} — CANCELAR`;
         });
 
-        // tirar o foco dos botões para o Espaço não os voltar a clicar
         document.addEventListener('click', (e) => {
             const b = e.target.closest('button');
             if (b) b.blur();
@@ -539,6 +801,17 @@
 
         function decideWinner(color) {
             socket.emit('action', { type: 'refereeDecision', color: color });
+        }
+
+        function getAthleteCategory(athleteName, fallbackCat) {
+            const ath = allAthletes.find(a => a.name.toLowerCase() === athleteName.toLowerCase());
+            if (!ath) return fallbackCat;
+            let divLabel = ath.division;
+            if (divLabel.toLowerCase().includes('senior')) divLabel = 'Sénior';
+            else if (divLabel.toLowerCase().includes('junior')) divLabel = 'Júnior';
+            else if (divLabel.toLowerCase().includes('benjamin')) divLabel = 'Benjamin';
+            else if (divLabel.toLowerCase().includes('master')) divLabel = 'Master';
+            return `${divLabel} ${ath.gender} ${ath.weight}`;
         }
 
         function applyAndNewMatch() {
@@ -552,18 +825,26 @@
             else if (div === 'Benjamins') divLabel = 'Benjamin';
             else if (div === 'Masters') divLabel = 'Master';
 
-            const categoryString = `${divLabel} ${gen} ${wei}`;
+            const defaultCategory = `${divLabel} ${gen} ${wei}`;
+            const blueAthlete = document.getElementById('blueName').value.trim() || 'AZUL';
+            const redAthlete = document.getElementById('redName').value.trim() || 'VERMELHO';
+
+            const blueCat = getAthleteCategory(blueAthlete, defaultCategory);
+            const redCat = getAthleteCategory(redAthlete, defaultCategory);
 
             const config = {
                 tournament: parseInt(document.getElementById('tournamentNum').value) || 1,
                 area: document.getElementById('courtArea').value,
                 matchNumber: document.getElementById('matchNumber').value,
-                category: categoryString,
+                category: defaultCategory,
+                blueCategory: blueCat,
+                redCategory: redCat,
+                isFriendly: isFriendlyMatch,
                 division: div,
                 gender: gen,
                 weight: wei,
-                blueName: document.getElementById('blueName').value.trim() || 'HONG',
-                redName: document.getElementById('redName').value.trim() || 'CHUNG',
+                blueName: blueAthlete,
+                redName: redAthlete,
                 roundTime: document.getElementById('roundTime').value,
                 restTime: document.getElementById('restTime').value,
                 maxRounds: document.getElementById('maxRounds').value
@@ -602,25 +883,25 @@
         }
 
         socket.on('updateState', (state) => {
-
             if (document.activeElement !== document.getElementById('tournamentNum') && state.tournament) {
                 document.getElementById('tournamentNum').value = state.tournament;
             }
-            
             if (document.activeElement !== document.getElementById('courtArea') && state.area) {
                 document.getElementById('courtArea').value = state.area;
             }
-
             if (document.activeElement !== document.getElementById('matchNumber')) {
                 document.getElementById('matchNumber').value = state.matchNumber;
             }
 
-            if (document.activeElement !== document.getElementById('blueName')) {
+            if (document.activeElement !== document.getElementById('inputSearchBlue')) {
                 document.getElementById('blueName').value = state.blueName;
             }
-            if (document.activeElement !== document.getElementById('redName')) {
+            if (document.activeElement !== document.getElementById('inputSearchRed')) {
                 document.getElementById('redName').value = state.redName;
             }
+
+            isFriendlyMatch = !!state.isFriendly;
+            updateFriendlyUI();
 
             renderHistory(state.roundsHistory, state.blueName, state.redName);
 
@@ -643,18 +924,18 @@
             btnUpdate.innerText = isLocked ? "Combate em Curso..." : "Atualizar Atletas & Novo Combate";
         });
         
-        //parar com o spacebar
         document.addEventListener('keydown', function(event) {
             if (event.code === 'Space') {
                 const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
                 if (activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea') {
                     return;
                 }
-
                 event.preventDefault(); 
                 triggerAction('timer');
             }
         });
+
+        onCategoryChanged();
     </script>
 </body>
 </html>

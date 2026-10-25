@@ -16,24 +16,52 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Google Apps Script - Torneio
+// Google Apps Script - Web App URL
 const GOOGLE_SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwy5PLb5i8hWukhROe7Xzrpy4xUu6LxqqqkeQwZSnv-yXp8WRTYOlXx27bomaRbT9Sm/exec";
-
-//Google Apps Script - Treinos
-//const GOOGLE_SHEET_TRAINING_URL = "https://script.google.com/macros/s/AKfycbziOWRd5Kf4_4kDSxL3g6z6EOfIXLlAjgsIvCyqASuZvFZxVPOhCCifFwEfT89lTwQp/exec";
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const POINT_GAP = 15;          // diferença de pontos que termina o round
-const GOLDEN_POINT_TIME = 30;  // segundos do ponto de ouro
-const KYESHI_TIME = 60;        // segundos de assistência médica
-const MAX_PENALTIES = 5;       // gam-jeom que fazem perder o round
+// LEITURA DA BASE DE DADOS DE ATLETAS (./database/athletes.txt)
+function loadAthletes() {
+    const dbPath = path.join(baseDir, 'database', 'athletes.txt');
+    if (!fs.existsSync(dbPath)) return [];
+    try {
+        const lines = fs.readFileSync(dbPath, 'utf8').split(/\r?\n/);
+        const list = [];
+        lines.forEach(line => {
+            const parts = line.split(';');
+            if (parts.length >= 4) {
+                list.push({
+                    name: parts[0].trim(),
+                    division: parts[1].trim(),
+                    gender: parts[2].trim(),
+                    weight: parts[3].trim().replace(/\s+/g, ''),
+                    club: parts[4] ? parts[4].trim() : ''
+                });
+            }
+        });
+        return list;
+    } catch (e) {
+        console.error("Erro ao ler athletes.txt:", e);
+        return [];
+    }
+}
+
+let athletesDb = loadAthletes();
+
+const POINT_GAP = 15;          
+const GOLDEN_POINT_TIME = 30;  
+const KYESHI_TIME = 60;        
+const MAX_PENALTIES = 5;       
 
 let gameState = {
     tournament: 1,
     area: "A",
     matchNumber: 1,
     category: "Sénior M -68kg",
+    blueCategory: "Sénior M -68kg",
+    redCategory: "Sénior M -68kg",
+    isFriendly: false,
     blueName: "AZUL",
     redName: "VERMELHO",
     blueScore: 0,
@@ -71,12 +99,16 @@ let gameState = {
 
 io.on('connection', (socket) => {
     socket.emit('updateState', gameState);
+    socket.emit('athletesList', athletesDb);
 
     socket.on('updateSettings', (data) => {
         if (data.tournament) gameState.tournament = parseInt(data.tournament);
         if (data.area) gameState.area = data.area;
         if (data.matchNumber) gameState.matchNumber = parseInt(data.matchNumber);
         if (data.category) gameState.category = data.category;
+        gameState.blueCategory = data.blueCategory || data.category;
+        gameState.redCategory = data.redCategory || data.category;
+        gameState.isFriendly = !!data.isFriendly;
         gameState.blueName = data.blueName;
         gameState.redName = data.redName;
         gameState.roundTimeConfig = parseInt(data.roundTime);
@@ -87,7 +119,15 @@ io.on('connection', (socket) => {
     });
 
     socket.on('action', (data) => {
-        if (gameState.matchOver && !['reset', 'nextMatch', 'manualScore', 'removePenalty', 'var'].includes(data.type)) return;
+        // RESET TOTAL: Tem prioridade absoluta
+        if (data.type === 'reset') {
+            resetMatch();
+            io.emit('updateState', gameState);
+            io.emit('updateTimer', gameState.roundTimeConfig);
+            return;
+        }
+
+        if (gameState.matchOver && !['nextMatch', 'manualScore', 'removePenalty', 'var'].includes(data.type)) return;
 
         if (data.type === 'score') {
             if (gameState.mode === 'rest' || gameState.mode === 'referee_decision' || gameState.kyeshiActive || gameState.varActive) return;
@@ -163,18 +203,14 @@ io.on('connection', (socket) => {
             gameState.matchNumber++;
             gameState.blueName = nextBlue;
             gameState.redName = nextRed;
-        } else if (data.type === 'reset') {
-            resetMatch();
         }
         io.emit('updateState', gameState);
     });
 });
 
-// ---------- POINT GAP ----------
 function checkPointGap() {
     if (gameState.mode !== 'round' || gameState.matchOver) return;
 
-    // 5.º gam-jeom: o round acaba e o adversário ganha
     if (gameState.bluePenalty >= MAX_PENALTIES || gameState.redPenalty >= MAX_PENALTIES) {
         gameState.isRunning = false;
         awardRound(gameState.bluePenalty >= MAX_PENALTIES ? 'red' : 'blue', `${MAX_PENALTIES} Gam-jeom`);
@@ -189,8 +225,6 @@ function checkPointGap() {
     }
 }
 
-// ---------- CORREÇÕES MANUAIS ----------
-// Se o round acabou (intervalo ou fim de combate), as correções aplicam-se ao último round.
 function finishedTarget() {
     const finished = (gameState.mode === 'rest' || gameState.matchOver) && gameState.roundsHistory.length > 0;
     return finished ? gameState.roundsHistory[gameState.roundsHistory.length - 1] : null;
@@ -228,7 +262,6 @@ function removePenalty(color) {
     if (entry) applyFinishedEdit(entry);
 }
 
-// Recalcula vencedor do round, rounds ganhos e se o combate deve terminar/reabrir
 function applyFinishedEdit(h) {
     if (h.bluePenalty >= MAX_PENALTIES) h.winner = 'red';
     else if (h.redPenalty >= MAX_PENALTIES) h.winner = 'blue';
@@ -237,7 +270,6 @@ function applyFinishedEdit(h) {
     else if (h.bluePenalty !== h.redPenalty) h.winner = h.bluePenalty < h.redPenalty ? 'blue' : 'red';
     else if ((h.blueHeadKicks || 0) !== (h.redHeadKicks || 0)) h.winner = h.blueHeadKicks > h.redHeadKicks ? 'blue' : 'red';
     else if ((h.blueTurningKicks || 0) !== (h.redTurningKicks || 0)) h.winner = h.blueTurningKicks > h.redTurningKicks ? 'blue' : 'red';
-    // empate total: mantém o vencedor anterior
     if (!String(h.method || '').includes('Corrigido')) h.method = (h.method || '') + ' [Corrigido]';
 
     gameState.blueScore = h.blueScore;
@@ -254,7 +286,6 @@ function applyFinishedEdit(h) {
     if (shouldEnd) {
         endMatch(gameState.matchOver);
     } else if (gameState.matchOver) {
-        // o combate afinal não tinha acabado: reabre e vai para o intervalo
         gameState.matchOver = false;
         gameState.winnerData = null;
         gameState.sheetSent = false;
@@ -263,7 +294,6 @@ function applyFinishedEdit(h) {
     }
 }
 
-// ---------- KYESHI ----------
 function toggleKyeshi() {
     if (gameState.matchOver || gameState.varActive) return;
     if (gameState.kyeshiActive) {
@@ -457,28 +487,27 @@ function endMatch(correction = false) {
     
     io.emit('matchEnded', gameState.winnerData);
 
-   if ((!gameState.sheetSent || correction) && gameState.roundsHistory.length > 0) {
+    if ((!gameState.sheetSent || correction) && gameState.roundsHistory.length > 0) {
         gameState.sheetSent = true;
 
-        // Formato: T1_A1, T1_A2...
         const formattedMatchId = `T${gameState.tournament || 1}_${gameState.area || 'A'}${gameState.matchNumber}`;
 
         const payload = {
             matchNumber: formattedMatchId,
             correcao: !!(correction || gameState.sheetResend),
             category: gameState.category,
+            blueCategory: gameState.blueCategory || gameState.category,
+            redCategory: gameState.redCategory || gameState.category,
             blueName: gameState.blueName,
             redName: gameState.redName,
             finalScore: `${gameState.blueRoundsWon} - ${gameState.redRoundsWon}`,
             r1: gameState.roundsHistory[0] ? `${gameState.roundsHistory[0].blueScore}-${gameState.roundsHistory[0].redScore}` : "-",
             r2: gameState.roundsHistory[1] ? `${gameState.roundsHistory[1].blueScore}-${gameState.roundsHistory[1].redScore}` : "-",
-            r3: gameState.roundsHistory[2] ? `${gameState.roundsHistory[2].blueScore}-${gameState.roundsHistory[2].redScore}` : "-"
+            r3: gameState.roundsHistory[2] ? `${gameState.roundsHistory[2].blueScore}-${gameState.roundsHistory[2].redScore}` : "-",
+            amigavel: gameState.isFriendly ? "SIM" : "NÃO"
         };
 
-        // Guarda sempre no ficheiro local primeiro
         saveLocalBackup(payload);
-
-        // Envia para o Google Sheets
         sendResultsToGoogleSheet(payload);
     }
 }
@@ -513,7 +542,7 @@ function resetMatch() {
 }
 
 setInterval(() => {
-    if (gameState.varActive) return; // VAR: tudo congelado
+    if (gameState.varActive) return;
     if (gameState.kyeshiActive) {
         gameState.kyeshiTime--;
         if (gameState.kyeshiTime <= 0) {
